@@ -1,0 +1,863 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Info, 
+  Cpu, 
+  Layers, 
+  RefreshCw, 
+  Copy, 
+  FileSpreadsheet, 
+  Globe, 
+  Check, 
+  AlertCircle,
+  HelpCircle,
+  ChevronRight,
+  TrendingUp,
+  Sliders,
+  Sparkles
+} from 'lucide-react';
+
+// Exact algorithm requested by the user
+function validateSAID(id) {
+  let type = id.substr(0, 1);
+  let sum = 0;
+  const _idLength = 10;
+  const _type1 = '1';
+  const _type2 = '2';
+  id = id.trim();
+  if (isNaN(parseInt(id)) || (id.length !== _idLength) || (type !== _type2 && type !== _type1)) {
+    return -1;
+  }
+  for (let num = 0; num < 10; num++) {
+    const digit = Number(id[num]);
+    if (num % 2 === 0) {
+      const doubled = digit * 2;
+      const ZFOdd = `00${doubled}`.slice(-2);
+      sum += Number(ZFOdd[0]) + Number(ZFOdd[1]);
+    } else {
+      sum += digit;
+    }
+  }
+  return (sum % 10 !== 0) ? -1 : type;
+}
+
+// Helper to generate a valid random Saudi ID
+function generateValidID(type = '1') {
+  let id = type;
+  for (let i = 0; i < 8; i++) {
+    id += Math.floor(Math.random() * 10).toString();
+  }
+  
+  for (let lastDigit = 0; lastDigit <= 9; lastDigit++) {
+    const candidate = id + lastDigit.toString();
+    if (validateSAID(candidate) === type) {
+      return candidate;
+    }
+  }
+  return generateValidID(type);
+}
+
+// Step-by-step analyzer based on the custom validation logic
+function analyzeIDSteps(id) {
+  if (!id || id.length !== 10) return null;
+  const steps = [];
+  let sum = 0;
+  
+  for (let num = 0; num < 10; num++) {
+    const digit = Number(id[num]);
+    let calculationStr = '';
+    let stepSumContribution = 0;
+    let isEvenIndex = (num % 2 === 0);
+
+    if (isEvenIndex) {
+      const doubled = digit * 2;
+      const ZFOdd = `00${doubled}`.slice(-2);
+      stepSumContribution = Number(ZFOdd[0]) + Number(ZFOdd[1]);
+      calculationStr = `${digit} × 2 = ${doubled} → "${ZFOdd}" → ${ZFOdd[0]} + ${ZFOdd[1]} = ${stepSumContribution}`;
+    } else {
+      stepSumContribution = digit;
+      calculationStr = `Direct addition = ${digit}`;
+    }
+    
+    sum += stepSumContribution;
+    steps.push({
+      position: num + 1,
+      digit,
+      isEvenIndex,
+      calculationStr,
+      contribution: stepSumContribution,
+      runningSum: sum
+    });
+  }
+  
+  return {
+    steps,
+    totalSum: sum,
+    isValid: sum % 10 === 0,
+    type: id[0]
+  };
+}
+
+const TRANSLATIONS = {
+  en: {
+    title: "Saudi ID Verification Hub",
+    subtitle: "Verify, generate, analyze, and learn the math behind Saudi National IDs and Iqamas.",
+    placeholder: "Enter 10-digit ID (e.g. 1xxxxxxxx or 2xxxxxxxx)",
+    validateBtn: "Validate ID",
+    statusValidCitizen: "Valid Saudi National ID (Citizen)",
+    statusValidResident: "Valid Iqama (Resident)",
+    statusInvalid: "Invalid Saudi ID / Iqama Structure",
+    invalidReason: "Must start with 1 or 2, be exactly 10 digits, and pass the checksum algorithm.",
+    type: "ID Type",
+    citizen: "Citizen (National ID)",
+    resident: "Resident (Iqama)",
+    notSet: "N/A",
+    tabs: {
+      single: "Single Validator",
+      batch: "Batch Validator",
+      generator: "ID Generator",
+      explainer: "How it Works"
+    },
+    labels: {
+      idNumber: "ID Number",
+      sumContribution: "Contribution to Sum",
+      action: "Action",
+      copied: "Copied!",
+      copy: "Copy ID",
+      generate: "Generate",
+      generateCitizen: "Generate Citizen ID",
+      generateResident: "Generate Iqama ID",
+      batchInputPlaceholder: "Paste a list of IDs (one per line, comma or space separated)...",
+      validateBatch: "Validate Batch List",
+      downloadCSV: "Export to CSV",
+      clear: "Clear All",
+      evenDigit: "Even Position (Doubled)",
+      oddDigit: "Odd Position (Direct Addition)",
+      step: "Digit",
+      algorithmDetails: "Algorithm Visual Breakdown",
+      formulaTitle: "The Formula Checksum Step-by-Step",
+      totalSum: "Total Sum",
+      checksumModulo: "Checksum Modulo (Sum % 10)",
+      validResult: "Valid (Modulo 10 is 0)",
+      invalidResult: "Invalid (Modulo 10 must be 0)",
+    },
+    educational: {
+      intro: "Saudi National IDs and Iqamas consist of exactly 10 digits. The integrity of an ID is validated using a specific Luhn-based checksum algorithm implemented in our script.",
+      stepsList: [
+        "First Digit check: Must be '1' for Saudi Citizens or '2' for Residents.",
+        "Weighting pass: Alternate digits starting from index 0 are multiplied by 2.",
+        "Digit Summing: For doubled digits, the digits of the result are summed individually (e.g., 14 becomes 1 + 4 = 5).",
+        "Direct Adding: The remaining odd-positioned digits are added as-is.",
+        "Modulo Verification: The grand sum of all operations must be divisible by 10 (i.e., sum % 10 === 0)."
+      ]
+    }
+  },
+  ar: {
+    title: "منصة التحقق من الهوية الوطنية والإقامة",
+    subtitle: "تحقق، قم بتوليد الهويات، وحلل العمليات الحسابية للهوية الوطنية والإقامة السعودية.",
+    placeholder: "أدخل رقم الهوية المكون من 10 خانات (مثال: 1xxxxxxxx أو 2xxxxxxxx)",
+    validateBtn: "تحقق من الهوية",
+    statusValidCitizen: "هوية وطنية سعودية صالحة (مواطن)",
+    statusValidResident: "إقامة صالحة (مقيم)",
+    statusInvalid: "رقم هوية أو إقامة غير صالح",
+    invalidReason: "يجب أن تبدأ بـ 1 أو 2، وتتكون من 10 خانات تماماً، وتجتاز خوارزمية التدقيق الحسابية.",
+    type: "نوع الهوية",
+    citizen: "مواطن (هوية وطنية)",
+    resident: "مقيم (إقامة)",
+    notSet: "غير محدد",
+    tabs: {
+      single: "التحقق الفردي",
+      batch: "التحقق الجماعي",
+      generator: "مولد الهويات التجريبية",
+      explainer: "كيف تعمل الخوارزمية"
+    },
+    labels: {
+      idNumber: "رقم الهوية",
+      sumContribution: "المساهمة في المجموع",
+      action: "الإجراء",
+      copied: "تم النسخ!",
+      copy: "نسخ الهوية",
+      generate: "توليد",
+      generateCitizen: "توليد هوية مواطن",
+      generateResident: "توليد إقامة مقيم",
+      batchInputPlaceholder: "أدخل قائمة أرقام هويات (كل رقم في سطر جديد، أو مفصولاً بفواصل)...",
+      validateBatch: "التحقق من القائمة",
+      downloadCSV: "تصدير إلى CSV",
+      clear: "مسح الكل",
+      evenDigit: "خانة زوجية (مضاعفة القيمة)",
+      oddDigit: "خانة فردية (جمع مباشر)",
+      step: "الرقم",
+      algorithmDetails: "التحليل المرئي للخوارزمية",
+      formulaTitle: "تحليل المعادلة خطوة بخطوة",
+      totalSum: "المجموع الكلي",
+      checksumModulo: "مؤشر التحقق (المجموع % 10)",
+      validResult: "صالح (باقي القسمة على 10 يساوي 0)",
+      invalidResult: "غير صالح (باقي القسمة على 10 يجب أن يساوي 0)",
+    },
+    educational: {
+      intro: "تتكون الهوية الوطنية السعودية والإقامة دائماً من 10 خانات. يتم التحقق من صحتها من خلال صيغة حسابية مخصصة تعتمد على خوارزمية 'لوهن' المعدلة والمنفذة في دالتنا البرمجية.",
+      stepsList: [
+        "فحص الخانة الأولى: يجب أن تبدأ الهوية بالرقم '1' للمواطنين أو الرقم '2' للمقيمين.",
+        "وزن الخانات: نمر على الخانات بحيث نضرب الخانات في المواقع الزوجية (مؤشر 0، 2، 4...) في الرقم 2.",
+        "جمع خانات النواتج: إذا كان ناتج الضرب رقماً ثنائياً (مثل 14)، يتم جمع خانتيه الفرديتين (1 + 4 = 5).",
+        "الجمع المباشر: الخانات في المواقع الفردية المتبقية تضاف مباشرة إلى المجموع الكلي دون تعديل.",
+        "التحقق النهائي: يجب أن يكون المجموع الكلي النهائي قابلاً للقسمة على 10 بدون باقٍ (أي المجموع % 10 === 0)."
+      ]
+    }
+  }
+};
+
+const SAID_CODE_STRING = 
+  "'use strict';\n" +
+  "/**\n" +
+  " * @param {string} id\n" +
+  " * @return {number}\n" +
+  " */\n" +
+  "function validateSAID(id) {\n" +
+  "  let type = id.substr(0, 1);\n" +
+  "  let sum = 0;\n" +
+  "  const _idLength = 10;\n" +
+  "  const _type1 = '1';\n" +
+  "  const _type2 = '2';\n" +
+  "  id = id.trim();\n" +
+  "  if (isNaN(parseInt(id)) || (id.length !== _idLength) || (type !== _type2 && type !== _type1)) {\n" +
+  "    return -1;\n" +
+  "  }\n" +
+  "  for (let num = 0; num < 10; num++) {\n" +
+  "    const digit = Number(id[num]);\n" +
+  "    if (num % 2 === 0) {\n" +
+  "      const doubled = digit * 2;\n" +
+  "      const ZFOdd = ('00' + doubled).slice(-2);\n" +
+  "      sum += Number(ZFOdd[0]) + Number(ZFOdd[1]);\n" +
+  "    } else {\n" +
+  "      sum += digit;\n" +
+  "    }\n" +
+  "  }\n" +
+  "  return (sum % 10 !== 0) ? -1 : type;\n" +
+  "}";
+
+export default function App() {
+  const [lang, setLang] = useState('en');
+  const [activeTab, setActiveTab] = useState('single');
+  const [singleInput, setSingleInput] = useState('');
+  const [singleResult, setSingleResult] = useState(null);
+  const [copiedText, setCopiedText] = useState('');
+  
+  // Batch State
+  const [batchInput, setBatchInput] = useState('');
+  const [batchResults, setBatchResults] = useState([]);
+  
+  // Generator State
+  const [genCount, setGenCount] = useState(5);
+  const [genType, setGenType] = useState('1'); // '1' = Citizen, '2' = Resident
+  const [generatedIDs, setGeneratedIDs] = useState([]);
+
+  const t = TRANSLATIONS[lang];
+  const isRtl = lang === 'ar';
+
+  // Perform live analysis as user types in Single Validation
+  useEffect(() => {
+    const trimmed = singleInput.trim();
+    if (trimmed.length > 0) {
+      const typeResult = validateSAID(trimmed);
+      const breakdown = analyzeIDSteps(trimmed);
+      setSingleResult({
+        isValid: typeResult !== -1,
+        type: typeResult,
+        breakdown
+      });
+    } else {
+      setSingleResult(null);
+    }
+  }, [singleInput]);
+
+  const copyToClipboard = (text) => {
+    const tempInput = document.createElement('input');
+    tempInput.value = text;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    try {
+      document.execCommand('copy');
+      setCopiedText(text);
+      setTimeout(() => setCopiedText(''), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+    document.body.removeChild(tempInput);
+  };
+
+  const handleBatchValidate = () => {
+    const items = batchInput.split(/[\n, ]+/).map(x => x.trim()).filter(x => x.length > 0);
+    const results = items.map(id => {
+      const validation = validateSAID(id);
+      let desc = t.statusInvalid;
+      if (validation === '1') desc = t.statusValidCitizen;
+      if (validation === '2') desc = t.statusValidResident;
+      return {
+        id,
+        isValid: validation !== -1,
+        type: validation,
+        description: desc
+      };
+    });
+    setBatchResults(results);
+  };
+
+  const handleGenerateList = () => {
+    const ids = [];
+    for (let i = 0; i < genCount; i++) {
+      ids.push({
+        id: generateValidID(genType),
+        type: genType === '1' ? t.citizen : t.resident
+      });
+    }
+    setGeneratedIDs(ids);
+  };
+
+  const handleExportCSV = () => {
+    if (batchResults.length === 0) return;
+    const headers = ["ID Number", "Valid", "Type Description"];
+    const rows = batchResults.map(r => [
+      r.id, 
+      r.isValid ? "TRUE" : "FALSE", 
+      r.isValid ? (r.type === '1' ? "Citizen" : "Resident") : "Invalid"
+    ]);
+    
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `sa_id_validation_results_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className={`min-h-screen bg-slate-50 text-slate-800 ${isRtl ? 'rtl font-sans' : 'font-sans'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      
+      {/* Premium Header */}
+      <header className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white shadow-md border-b-4 border-amber-500">
+        <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            
+            <div className="flex items-center gap-4 text-center md:text-left">
+              <div className="p-3 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md shadow-inner">
+                <Cpu className="w-10 h-10 text-amber-400 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{t.title}</h1>
+                  <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    v1.0.0
+                  </span>
+                </div>
+                <p className="text-emerald-100 text-sm mt-1 max-w-xl">{t.subtitle}</p>
+              </div>
+            </div>
+
+            {/* Language Switcher */}
+            <button 
+              onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-xl border border-white/20 transition-all font-medium text-sm backdrop-blur"
+            >
+              <Globe className="w-4 h-4 text-amber-400" />
+              <span>{lang === 'en' ? 'العربية' : 'English'}</span>
+            </button>
+            
+          </div>
+        </div>
+      </header>
+
+      {}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 p-1.5 bg-slate-200/70 rounded-2xl mb-8 max-w-4xl mx-auto shadow-sm">
+          {Object.entries(t.tabs).map(([key, label]) => {
+            const isActive = activeTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                  isActive 
+                    ? 'bg-white text-emerald-800 shadow-md transform scale-102 border-b-2 border-emerald-600' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                {key === 'single' && <CheckCircle2 className={`w-4 h-4 ${isActive ? 'text-emerald-600' : ''}`} />}
+                {key === 'batch' && <Layers className={`w-4 h-4 ${isActive ? 'text-emerald-600' : ''}`} />}
+                {key === 'generator' && <RefreshCw className={`w-4 h-4 ${isActive ? 'text-emerald-600' : ''}`} />}
+                {key === 'explainer' && <Info className={`w-4 h-4 ${isActive ? 'text-emerald-600' : ''}`} />}
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Dynamic Panel Content */}
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-6 md:p-8">
+          
+          {/* ================= SINGLE VALIDATOR PANEL ================= */}
+          {activeTab === 'single' && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="max-w-2xl mx-auto text-center space-y-4">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  {t.tabs.single}
+                </h2>
+                <p className="text-slate-500 text-sm">
+                  {lang === 'en' 
+                    ? "Input any 10-digit Saudi Citizen ID or Resident Iqama ID. The validation checks compliance in real-time." 
+                    : "أدخل رقم هوية وطنية أو إقامة مكون من 10 خانات ليقوم النظام بالتحقق الفوري الحسابي من دقة وصلاحية الرقم."}
+                </p>
+                
+                <div className="relative mt-6">
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={singleInput}
+                    onChange={(e) => setSingleInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder={t.placeholder}
+                    className={`w-full py-4 px-6 text-lg md:text-xl font-mono text-center rounded-2xl border-2 tracking-widest outline-none transition-all ${
+                      singleResult === null 
+                        ? 'border-slate-200 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10'
+                        : singleResult.isValid 
+                          ? 'border-emerald-500 bg-emerald-50/20 focus:ring-4 focus:ring-emerald-500/10 text-emerald-900' 
+                          : 'border-rose-400 bg-rose-50/20 focus:ring-4 focus:ring-rose-500/10 text-rose-900'
+                    }`}
+                  />
+                  {singleInput && (
+                    <button 
+                      onClick={() => setSingleInput('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                      title={t.labels.clear}
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Validation Status Box */}
+              {singleResult && (
+                <div className={`p-6 rounded-2xl border transition-all max-w-2xl mx-auto ${
+                  singleResult.isValid 
+                    ? 'bg-emerald-100/50 border-emerald-300 text-emerald-900' 
+                    : 'bg-rose-100/50 border-rose-300 text-rose-900'
+                }`}>
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1">
+                      {singleResult.isValid ? (
+                        <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
+                      ) : (
+                        <XCircle className="w-8 h-8 text-rose-600 shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h3 className="font-extrabold text-lg">
+                        {singleResult.isValid 
+                          ? (singleResult.type === '1' ? t.statusValidCitizen : t.statusValidResident)
+                          : t.statusInvalid
+                        }
+                      </h3>
+                      <p className="text-sm opacity-90">
+                        {singleResult.isValid 
+                          ? (lang === 'en' 
+                              ? `Verification successful. Checksum calculated correctly.` 
+                              : `عملية التحقق نجحت. مؤشر الحساب سليم ومطابق للقواعد الرسمية.`)
+                          : t.invalidReason
+                        }
+                      </p>
+                      
+                      <div className="pt-3 flex gap-3 text-xs font-semibold">
+                        <span className={`px-2.5 py-1 rounded-full ${singleResult.isValid ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                          {t.type}: {singleResult.isValid ? (singleResult.type === '1' ? t.citizen : t.resident) : t.notSet}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-full ${singleResult.isValid ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                          {lang === 'en' ? 'First Digit' : 'الخانة الأولى'}: {singleInput[0] || '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step by step calculation visualization */}
+              {singleResult && singleResult.breakdown && (
+                <div className="border-t border-slate-100 pt-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                      <Sliders className="w-5 h-5 text-emerald-600" />
+                      {t.labels.algorithmDetails}
+                    </h3>
+                    <span className="text-xs text-slate-500 font-mono">
+                      Input: {singleInput}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {singleResult.breakdown.steps.map((step) => (
+                      <div 
+                        key={step.position} 
+                        className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                          step.isEvenIndex 
+                            ? 'bg-amber-50/40 border-amber-200/70' 
+                            : 'bg-emerald-50/20 border-emerald-100/70'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            {t.labels.step} #{step.position}
+                          </span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            step.isEvenIndex ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {step.isEvenIndex ? 'Even' : 'Odd'}
+                          </span>
+                        </div>
+
+                        <div className="text-center py-2">
+                          <div className="text-3xl font-extrabold text-slate-800 font-mono">
+                            {step.digit}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-1 min-h-[32px] flex items-center justify-center px-1">
+                            {step.calculationStr}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center text-xs">
+                          <span className="text-slate-400">{t.labels.sumContribution}:</span>
+                          <span className="font-extrabold text-slate-800 font-mono">+{step.contribution}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Modulo Check Visualization */}
+                  <div className="bg-slate-100 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="space-y-1 text-center md:text-left">
+                      <div className="text-sm font-semibold text-slate-500">{t.labels.formulaTitle}</div>
+                      <div className="text-xs text-slate-400">
+                        {lang === 'en' 
+                          ? "Sum = (Contribution of Even indices parsed individually) + (Odd indices directly added)"
+                          : "المجموع = (مجموع مساهمة الخانات الزوجية المحسوبة منفردة) + (الخانات الفردية المضافة مباشرة)"}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 justify-center">
+                      {/* Total Sum Card */}
+                      <div className="bg-white py-3 px-5 rounded-xl border border-slate-200 text-center shadow-sm">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase">{t.labels.totalSum}</div>
+                        <div className="text-2xl font-black text-slate-800 font-mono">
+                          {singleResult.breakdown.totalSum}
+                        </div>
+                      </div>
+
+                      <div className="text-slate-400 text-xl font-bold">➔</div>
+
+                      {/* Modulo Card */}
+                      <div className="bg-white py-3 px-5 rounded-xl border border-slate-200 text-center shadow-sm">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase">{t.labels.checksumModulo}</div>
+                        <div className="text-2xl font-black text-slate-800 font-mono">
+                          {singleResult.breakdown.totalSum} % 10 = {singleResult.breakdown.totalSum % 10}
+                        </div>
+                      </div>
+
+                      <div className="text-slate-400 text-xl font-bold">➔</div>
+
+                      {/* Status badge */}
+                      <div className={`py-3 px-5 rounded-xl text-center font-bold text-sm shadow-sm ${
+                        singleResult.isValid ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                      }`}>
+                        <div>{singleResult.isValid ? t.labels.validResult : t.labels.invalidResult}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= BATCH VALIDATOR PANEL ================= */}
+          {activeTab === 'batch' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="max-w-2xl mx-auto text-center space-y-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                  <Layers className="text-emerald-600 w-6 h-6" />
+                  {t.tabs.batch}
+                </h2>
+                <p className="text-slate-500 text-sm">
+                  {lang === 'en' 
+                    ? "Validate a bulk list of IDs quickly. Great for testing batches or database cleanups." 
+                    : "تحقق من مجموعة كاملة من أرقام الهويات دفعة واحدة. حل مثالي لاختبار البيانات أو تنقية قواعد البيانات."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+                <div className="lg:col-span-5 space-y-4">
+                  <textarea
+                    rows={8}
+                    value={batchInput}
+                    onChange={(e) => setBatchInput(e.target.value)}
+                    placeholder={t.labels.batchInputPlaceholder}
+                    className="w-full p-4 font-mono text-sm border-2 border-slate-200 rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                  />
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBatchValidate}
+                      disabled={!batchInput.trim()}
+                      className="flex-1 py-3 px-5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-semibold rounded-xl text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {t.labels.validateBatch}
+                    </button>
+                    <button
+                      onClick={() => { setBatchInput(''); setBatchResults([]); }}
+                      className="py-3 px-4 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 text-sm transition-all"
+                    >
+                      {t.labels.clear}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-7 space-y-4">
+                  {batchResults.length > 0 ? (
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[380px]">
+                      
+                      <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-500">
+                          {lang === 'en' 
+                            ? `Showing ${batchResults.length} validated items` 
+                            : `عرض ${batchResults.length} عنصراً تم التحقق منه`}
+                        </span>
+                        <button
+                          onClick={handleExportCSV}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                          {t.labels.downloadCSV}
+                        </button>
+                      </div>
+
+                      <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                        {batchResults.map((item, index) => (
+                          <div key={index} className="px-4 py-3 flex items-center justify-between text-sm hover:bg-slate-50/50">
+                            <span className="font-mono text-slate-800 font-bold">{item.id}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-500">{item.description}</span>
+                              {item.isValid ? (
+                                <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                                  Valid
+                                </span>
+                              ) : (
+                                <span className="bg-rose-100 text-rose-800 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                                  Invalid
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-[380px] border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                      <Layers className="w-12 h-12 mb-3 opacity-40" />
+                      <p className="text-sm font-medium">
+                        {lang === 'en' 
+                          ? "Run a batch validation to see results, statistics, and export features here." 
+                          : "قم بتشغيل الفحص الجماعي لعرض النتائج والتحليلات وخيارات التصدير هنا."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= ID GENERATOR PANEL ================= */}
+          {activeTab === 'generator' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="max-w-2xl mx-auto text-center space-y-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                  <RefreshCw className="text-emerald-600 w-6 h-6" />
+                  {t.labels.generate}
+                </h2>
+                <p className="text-slate-500 text-sm">
+                  {lang === 'en' 
+                    ? "Generate algorithmically sound mock Saudi National IDs or Iqama numbers for software testing and verification purposes." 
+                    : "قم بتوليد أرقام تجريبية صالحة حسابياً للهوية الوطنية أو الإقامة لاستخدامها في أغراض التطوير والاختبار والتحقق البرمجي."}
+                </p>
+              </div>
+
+              <div className="max-w-3xl mx-auto border border-slate-200 rounded-2xl p-6 bg-slate-50/40 space-y-6">
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  
+                  {/* Select Type */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">{t.type}</label>
+                    <select
+                      value={genType}
+                      onChange={(e) => setGenType(e.target.value)}
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-white text-sm outline-none focus:border-emerald-600"
+                    >
+                      <option value="1">{t.citizen} (Starts with 1)</option>
+                      <option value="2">{t.resident} (Starts with 2)</option>
+                    </select>
+                  </div>
+
+                  {/* Count */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">
+                      {lang === 'en' ? 'Amount to Generate' : 'العدد المطلوب'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={genCount}
+                      onChange={(e) => setGenCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-white text-sm outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  {/* Generate Button */}
+                  <button
+                    onClick={handleGenerateList}
+                    className="w-full py-3 px-5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-950 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-700/10"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    {lang === 'en' ? 'Generate IDs' : 'توليد المعرفات'}
+                  </button>
+
+                </div>
+
+                {generatedIDs.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                    {generatedIDs.map((item, index) => (
+                      <div key={index} className="p-3.5 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <span className="font-mono text-base font-bold text-emerald-800 tracking-wider">
+                            {item.id}
+                          </span>
+                          <span className="text-[11px] bg-slate-100 text-slate-600 font-semibold px-2.5 py-0.5 rounded-full">
+                            {item.type}
+                          </span>
+                        </div>
+                        
+                        <button
+                          onClick={() => copyToClipboard(item.id)}
+                          className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-all"
+                        >
+                          {copiedText === item.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>{t.labels.copied}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>{t.labels.copy}</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+          {/* ================= ALGORITHM EXPLAINER ================= */}
+          {activeTab === 'explainer' && (
+            <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto">
+              <div className="text-center space-y-2">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                  <HelpCircle className="text-emerald-600 w-6 h-6" />
+                  {t.educational.intro}
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                
+                {/* Code Showcase - Render Code from pre-built safe plain strings */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase">JavaScript Implementation</span>
+                    <button
+                      onClick={() => copyToClipboard(SAID_CODE_STRING)}
+                      className="text-xs flex items-center gap-1.5 text-slate-500 hover:text-emerald-700 font-semibold cursor-pointer"
+                    >
+                      {copiedText === SAID_CODE_STRING ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{t.labels.copied}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Code</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="bg-slate-900 text-slate-200 text-xs p-5 rounded-2xl overflow-x-auto font-mono leading-relaxed border border-slate-800 shadow-inner">
+                    {SAID_CODE_STRING}
+                  </pre>
+                </div>
+
+                {/* Steps List */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold text-slate-800">
+                    {lang === 'en' ? 'Algorithmic Rules' : 'قواعد الخوارزمية'}
+                  </h3>
+                  <div className="space-y-3">
+                    {t.educational.stepsList.map((step, idx) => (
+                      <div key={idx} className="flex gap-4 items-start p-3 hover:bg-slate-50 rounded-xl transition-all">
+                        <div className="w-6 h-6 shrink-0 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full flex items-center justify-center">
+                          {idx + 1}
+                        </div>
+                        <p className="text-sm text-slate-600 mt-0.5">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs space-y-1">
+                    <span className="font-extrabold flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                      Did you know?
+                    </span>
+                    <p className="opacity-90">
+                      Even indices are multiplied by 2 because the algorithm targets the alternating 0-indexed positions (1st, 3rd, 5th, 7th, 9th numbers). It differs slightly from the standard Luhn algorithm in how it formats double-digit zero padding (`"00" + doubled`).
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      </main>
+
+      <footer className="border-t border-slate-200 bg-white py-6 mt-16 text-center text-xs text-slate-400">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p>© {new Date().getFullYear()} Saudi ID Verification Suite. Built precisely using custom LuhnChecksum.</p>
+          <div className="flex gap-4">
+            <span className="hover:text-slate-600 transition-colors">Developer Utilities</span>
+            <span>•</span>
+            <span className="hover:text-slate-600 transition-colors">Bilingual Tool</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
